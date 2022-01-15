@@ -4,7 +4,7 @@ from rest_framework import serializers
 from .models import User, advisers,booking
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.models import update_last_login
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, login
 from rest_framework_simplejwt.tokens import RefreshToken
 
 class advisersserializer(serializers.ModelSerializer):
@@ -50,7 +50,7 @@ class loginserializer(serializers.Serializer):
             )
         try:
             refresh = RefreshToken.for_user(user)
-            update_last_login(None, user)
+            login(self.context['request'], user)
             
         except User.DoesNotExist:
             raise serializers.ValidationError(
@@ -63,6 +63,11 @@ class loginserializer(serializers.Serializer):
             'access': str(refresh.access_token)
         }
 
+class ChangePasswordSerializer(serializers.Serializer):
+    model = User
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)
+    
 
 class bookingserializer(serializers.Serializer):
     booking_time = serializers.DateTimeField(input_formats=['%Y-%m-%d %H:%M'])

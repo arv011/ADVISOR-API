@@ -1,13 +1,14 @@
-# from django.shortcuts import render
+from django.shortcuts import render
 # from django.http import response
 from django.contrib.auth.models import User
 from django.http.response import HttpResponseNotAllowed
 from .models import advisers, booking
-from .serializer import advisersserializer, registeruserserializer, loginserializer, bookingserializer, listbookingserializer
+from .serializer import advisersserializer, registeruserserializer, loginserializer, bookingserializer, listbookingserializer,\
+    ChangePasswordSerializer
 from rest_framework import serializers, status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
-from rest_framework.generics import CreateAPIView,RetrieveAPIView,ListAPIView
+from rest_framework.generics import CreateAPIView,RetrieveAPIView,ListAPIView,UpdateAPIView
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -34,6 +35,8 @@ class adviserviewset(viewsets.ModelViewSet):
         
         return super(adviserviewset,self).get_permissions()   
         
+def firstpage(request):
+    return render(request,'index.html')
 
 class registerview(APIView):
     def post(self, request):
@@ -61,7 +64,7 @@ class registerview(APIView):
 class loginapiview(APIView):
     serializer_class = loginserializer
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(context = {'request':request}, data=request.data)
         serializer.is_valid(raise_exception=True)
         res = {
             'user_id' : serializer.data['user_id'],
@@ -71,7 +74,36 @@ class loginapiview(APIView):
         return Response(res,status= status.HTTP_200_OK)
 
     
-    
+class ChangePasswordView(UpdateAPIView):
+    serializer_class = ChangePasswordSerializer
+    permission_classes = (IsAuthenticated,)
+    model = User
+
+    def get_object(self, queryset=None):
+        obj = self.request.user
+        return obj
+
+    def update(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            # Check old password
+            if not self.object.check_password(serializer.data.get("old_password")):
+                return Response({"old_password": ["Wrong password."]}, status=status.HTTP_400_BAD_REQUEST)
+            # set_password also hashes the password that the user will get
+            self.object.set_password(serializer.data.get("new_password"))
+            self.object.save()
+            response = {
+                'status': 'success',
+                'message': 'Password updated successfully',
+            }
+
+            return Response(response, status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 class adviserbookingapi(APIView):
     authentication_classes = [JWTAuthentication,]
     permission_classes = [IsAuthenticated,]
